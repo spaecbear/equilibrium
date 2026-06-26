@@ -31,7 +31,7 @@ export default function AppTabs() {
       <NativeTabs.Trigger name="expenditures">
         <NativeTabs.Trigger.Label>Spent</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
+          src={require('@/assets/images/tabIcons/home.png')}
           renderingMode="template"
         />
       </NativeTabs.Trigger>
@@ -47,7 +47,7 @@ export default function AppTabs() {
       <NativeTabs.Trigger name="charts">
         <NativeTabs.Trigger.Label>Charts</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
+          src={require('@/assets/images/tabIcons/home.png')}
           renderingMode="template"
         />
       </NativeTabs.Trigger>
