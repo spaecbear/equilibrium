@@ -1,4 +1,4 @@
-import { SafeAreaView, StyleSheet, Text, View, ScrollView, Pressable } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { Colors, Spacing, BottomTabInset } from '@/constants/theme';
 import { DeckList } from '@/components/deck-list';
@@ -22,15 +22,8 @@ export default function ExpendituresScreen() {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <View>
-              <Text style={styles.title}>Expenditures</Text>
-              <Text style={styles.subtitle}>Track your spending</Text>
-            </View>
-            <Pressable style={styles.addButton} onPress={handleCreateDeck}>
-              <Text style={styles.addButtonText}>+ Add</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.title}>Expenditures</Text>
+          <Text style={styles.subtitle}>Track your spending</Text>
         </View>
 
         {/* Deck List */}
@@ -74,11 +67,6 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: Spacing.four,
   },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
   title: {
     color: Colors.dark.text,
     fontSize: 28,
@@ -89,20 +77,6 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
     fontSize: 14,
     fontWeight: '500',
-  },
-  addButton: {
-    backgroundColor: Colors.dark.accent,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.three,
-    minWidth: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    color: Colors.dark.background,
-    fontSize: 16,
-    fontWeight: '700',
   },
   deckListContainer: {
     marginBottom: Spacing.three,
