@@ -1,7 +1,5 @@
-import * as SQLite from 'expo-sqlite';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeckColor, DeckIcon } from '@/constants/theme';
-
-const db = SQLite.openDatabaseSync('equilibrium.db');
 
 export type Category = 'assets' | 'expenditures' | 'incomes';
 
@@ -24,41 +22,29 @@ export interface Card {
   updatedAt: string;
 }
 
-// Initialize the database schema
+// Storage keys
+const DECKS_KEY = '@equilibrium:decks';
+const CARDS_KEY = '@equilibrium:cards';
+
+// In-memory cache for performance
+let decksCache: Deck[] = [];
+let cardsCache: Card[] = [];
+let isInitialized = false;
+
+// Initialize storage
 export async function initializeDatabase() {
+  if (isInitialized) return;
+
   try {
-    // Create decks table
-    db.execSync(`
-      CREATE TABLE IF NOT EXISTS decks (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        category TEXT NOT NULL CHECK(category IN ('assets', 'expenditures', 'incomes')),
-        color TEXT NOT NULL,
-        icon TEXT NOT NULL,
-        createdAt TEXT NOT NULL
-      );
-    `);
+    // Load existing data or start fresh
+    const [decksData, cardsData] = await Promise.all([
+      AsyncStorage.getItem(DECKS_KEY),
+      AsyncStorage.getItem(CARDS_KEY),
+    ]);
 
-    // Create cards table
-    db.execSync(`
-      CREATE TABLE IF NOT EXISTS cards (
-        id TEXT PRIMARY KEY,
-        deckId TEXT NOT NULL,
-        amount REAL NOT NULL,
-        date TEXT NOT NULL,
-        note TEXT,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL,
-        FOREIGN KEY(deckId) REFERENCES decks(id) ON DELETE CASCADE
-      );
-    `);
-
-    // Create indexes for performance
-    db.execSync(`
-      CREATE INDEX IF NOT EXISTS idx_cards_deckId ON cards(deckId);
-      CREATE INDEX IF NOT EXISTS idx_cards_date ON cards(date);
-      CREATE INDEX IF NOT EXISTS idx_decks_category ON decks(category);
-    `);
+    decksCache = decksData ? JSON.parse(decksData) : [];
+    cardsCache = cardsData ? JSON.parse(cardsData) : [];
+    isInitialized = true;
 
     console.log('Database initialized successfully');
   } catch (error) {
@@ -66,203 +52,177 @@ export async function initializeDatabase() {
   }
 }
 
+// Helper to persist decks
+async function persistDecks() {
+  try {
+    await AsyncStorage.setItem(DECKS_KEY, JSON.stringify(decksCache));
+  } catch (error) {
+    console.error('Failed to persist decks:', error);
+  }
+}
+
+// Helper to persist cards
+async function persistCards() {
+  try {
+    await AsyncStorage.setItem(CARDS_KEY, JSON.stringify(cardsCache));
+  } catch (error) {
+    console.error('Failed to persist cards:', error);
+  }
+}
+
 // Deck operations
-export function createDeck(name: string, category: Category, color: DeckColor, icon: DeckIcon): Deck {
+export async function createDeck(name: string, category: Category, color: DeckColor, icon: DeckIcon): Promise<Deck> {
   const id = `deck_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const createdAt = new Date().toISOString();
 
-  const stmt = db.prepareSync(`
-    INSERT INTO decks (id, name, category, color, icon, createdAt)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
+  const deck: Deck = { id, name, category, color, icon, createdAt };
+  decksCache.push(deck);
+  await persistDecks();
 
-  stmt.executeSync([id, name, category, color, icon, createdAt]);
-
-  return { id, name, category, color, icon, createdAt };
+  return deck;
 }
 
 export function getDecksByCategory(category: Category): Deck[] {
-  const stmt = db.prepareSync(`
-    SELECT * FROM decks WHERE category = ? ORDER BY createdAt DESC
-  `);
-
-  const result = stmt.allSync(category) as Deck[];
-  return result;
+  return decksCache
+    .filter((d) => d.category === category)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export function getDeckById(id: string): Deck | null {
-  const stmt = db.prepareSync(`SELECT * FROM decks WHERE id = ?`);
-  const result = stmt.allSync(id) as Deck[];
-  return result.length > 0 ? result[0] : null;
+  return decksCache.find((d) => d.id === id) ?? null;
 }
 
-export function updateDeck(id: string, updates: Partial<Omit<Deck, 'id' | 'createdAt'>>): void {
-  const currentDeck = getDeckById(id);
-  if (!currentDeck) throw new Error(`Deck ${id} not found`);
+export async function updateDeck(id: string, updates: Partial<Omit<Deck, 'id' | 'createdAt'>>): Promise<void> {
+  const deckIndex = decksCache.findIndex((d) => d.id === id);
+  if (deckIndex === -1) throw new Error(`Deck ${id} not found`);
 
-  const name = updates.name ?? currentDeck.name;
-  const color = updates.color ?? currentDeck.color;
-  const icon = updates.icon ?? currentDeck.icon;
+  const currentDeck = decksCache[deckIndex];
+  decksCache[deckIndex] = {
+    ...currentDeck,
+    name: updates.name ?? currentDeck.name,
+    color: updates.color ?? currentDeck.color,
+    icon: updates.icon ?? currentDeck.icon,
+  };
 
-  const stmt = db.prepareSync(`
-    UPDATE decks SET name = ?, color = ?, icon = ? WHERE id = ?
-  `);
-
-  stmt.executeSync([name, color, icon, id]);
+  await persistDecks();
 }
 
-export function deleteDeck(id: string): void {
-  const stmt = db.prepareSync(`DELETE FROM decks WHERE id = ?`);
-  stmt.executeSync(id);
+export async function deleteDeck(id: string): Promise<void> {
+  decksCache = decksCache.filter((d) => d.id !== id);
+  cardsCache = cardsCache.filter((c) => c.deckId !== id);
+
+  await Promise.all([persistDecks(), persistCards()]);
 }
 
 // Card operations
-export function createCard(
+export async function createCard(
   deckId: string,
   amount: number,
   date: string,
   note: string | null = null
-): Card {
+): Promise<Card> {
   const id = `card_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const createdAt = new Date().toISOString();
   const updatedAt = createdAt;
 
-  const stmt = db.prepareSync(`
-    INSERT INTO cards (id, deckId, amount, date, note, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
+  const card: Card = { id, deckId, amount, date, note, createdAt, updatedAt };
+  cardsCache.push(card);
+  await persistCards();
 
-  stmt.executeSync([id, deckId, amount, date, note, createdAt, updatedAt]);
-
-  return { id, deckId, amount, date, note, createdAt, updatedAt };
+  return card;
 }
 
 export function getCardsByDeckAndMonth(deckId: string, year: number, month: number): Card[] {
   const monthStr = String(month).padStart(2, '0');
   const yearStr = String(year);
-  const datePattern = `${yearStr}-${monthStr}%`;
+  const datePrefix = `${yearStr}-${monthStr}`;
 
-  const stmt = db.prepareSync(`
-    SELECT * FROM cards
-    WHERE deckId = ? AND date LIKE ?
-    ORDER BY date DESC
-  `);
-
-  const result = stmt.allSync(deckId, datePattern) as Card[];
-  return result;
+  return cardsCache
+    .filter((c) => c.deckId === deckId && c.date.startsWith(datePrefix))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export function getCardsByDeck(deckId: string): Card[] {
-  const stmt = db.prepareSync(`
-    SELECT * FROM cards WHERE deckId = ? ORDER BY date DESC
-  `);
-
-  const result = stmt.allSync(deckId) as Card[];
-  return result;
+  return cardsCache
+    .filter((c) => c.deckId === deckId)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export function getCardsByCategory(category: Category, year: number, month: number): Card[] {
   const monthStr = String(month).padStart(2, '0');
   const yearStr = String(year);
-  const datePattern = `${yearStr}-${monthStr}%`;
+  const datePrefix = `${yearStr}-${monthStr}`;
 
-  const stmt = db.prepareSync(`
-    SELECT c.* FROM cards c
-    INNER JOIN decks d ON c.deckId = d.id
-    WHERE d.category = ? AND c.date LIKE ?
-    ORDER BY c.date DESC
-  `);
+  const deckIds = new Set(decksCache.filter((d) => d.category === category).map((d) => d.id));
 
-  const result = stmt.allSync(category, datePattern) as Card[];
-  return result;
+  return cardsCache
+    .filter((c) => deckIds.has(c.deckId) && c.date.startsWith(datePrefix))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
-export function updateCard(id: string, updates: Partial<Omit<Card, 'id' | 'deckId' | 'createdAt'>>): void {
-  const stmt = db.prepareSync(`
-    SELECT * FROM cards WHERE id = ?
-  `);
-  const currentCards = stmt.allSync(id) as Card[];
-  if (currentCards.length === 0) throw new Error(`Card ${id} not found`);
+export async function updateCard(id: string, updates: Partial<Omit<Card, 'id' | 'deckId' | 'createdAt'>>): Promise<void> {
+  const cardIndex = cardsCache.findIndex((c) => c.id === id);
+  if (cardIndex === -1) throw new Error(`Card ${id} not found`);
 
-  const currentCard = currentCards[0];
-  const amount = updates.amount ?? currentCard.amount;
-  const date = updates.date ?? currentCard.date;
-  const note = updates.note ?? currentCard.note;
-  const updatedAt = new Date().toISOString();
+  const currentCard = cardsCache[cardIndex];
+  cardsCache[cardIndex] = {
+    ...currentCard,
+    amount: updates.amount ?? currentCard.amount,
+    date: updates.date ?? currentCard.date,
+    note: updates.note ?? currentCard.note,
+    updatedAt: new Date().toISOString(),
+  };
 
-  const updateStmt = db.prepareSync(`
-    UPDATE cards SET amount = ?, date = ?, note = ?, updatedAt = ? WHERE id = ?
-  `);
-
-  updateStmt.executeSync([amount, date, note, updatedAt, id]);
+  await persistCards();
 }
 
-export function deleteCard(id: string): void {
-  const stmt = db.prepareSync(`DELETE FROM cards WHERE id = ?`);
-  stmt.executeSync(id);
+export async function deleteCard(id: string): Promise<void> {
+  cardsCache = cardsCache.filter((c) => c.id !== id);
+  await persistCards();
 }
 
 // Aggregation queries
 export function getDeckTotal(deckId: string): number {
-  const stmt = db.prepareSync(`
-    SELECT SUM(amount) as total FROM cards WHERE deckId = ?
-  `);
-
-  const result = stmt.allSync(deckId) as Array<{ total: number | null }>;
-  return result[0]?.total ?? 0;
+  return cardsCache
+    .filter((c) => c.deckId === deckId)
+    .reduce((sum, card) => sum + card.amount, 0);
 }
 
 export function getDeckTotalForMonth(deckId: string, year: number, month: number): number {
   const monthStr = String(month).padStart(2, '0');
   const yearStr = String(year);
-  const datePattern = `${yearStr}-${monthStr}%`;
+  const datePrefix = `${yearStr}-${monthStr}`;
 
-  const stmt = db.prepareSync(`
-    SELECT SUM(amount) as total FROM cards WHERE deckId = ? AND date LIKE ?
-  `);
-
-  const result = stmt.allSync(deckId, datePattern) as Array<{ total: number | null }>;
-  return result[0]?.total ?? 0;
+  return cardsCache
+    .filter((c) => c.deckId === deckId && c.date.startsWith(datePrefix))
+    .reduce((sum, card) => sum + card.amount, 0);
 }
 
 export function getCategoryTotal(category: Category): number {
-  const stmt = db.prepareSync(`
-    SELECT SUM(c.amount) as total FROM cards c
-    INNER JOIN decks d ON c.deckId = d.id
-    WHERE d.category = ?
-  `);
+  const deckIds = new Set(decksCache.filter((d) => d.category === category).map((d) => d.id));
 
-  const result = stmt.allSync(category) as Array<{ total: number | null }>;
-  return result[0]?.total ?? 0;
+  return cardsCache
+    .filter((c) => deckIds.has(c.deckId))
+    .reduce((sum, card) => sum + card.amount, 0);
 }
 
 export function getCategoryTotalForMonth(category: Category, year: number, month: number): number {
   const monthStr = String(month).padStart(2, '0');
   const yearStr = String(year);
-  const datePattern = `${yearStr}-${monthStr}%`;
+  const datePrefix = `${yearStr}-${monthStr}`;
 
-  const stmt = db.prepareSync(`
-    SELECT SUM(c.amount) as total FROM cards c
-    INNER JOIN decks d ON c.deckId = d.id
-    WHERE d.category = ? AND c.date LIKE ?
-  `);
+  const deckIds = new Set(decksCache.filter((d) => d.category === category).map((d) => d.id));
 
-  const result = stmt.allSync(category, datePattern) as Array<{ total: number | null }>;
-  return result[0]?.total ?? 0;
+  return cardsCache
+    .filter((c) => deckIds.has(c.deckId) && c.date.startsWith(datePrefix))
+    .reduce((sum, card) => sum + card.amount, 0);
 }
 
-// For asset history – get the latest value as of a date
+// Get the latest asset value as of a date
 export function getAssetLatestValue(deckId: string, asOfDate?: string): number {
-  const dateFilter = asOfDate ? `date <= ?` : '1=1';
-  const params = asOfDate ? [deckId, asOfDate] : [deckId];
+  const cards = cardsCache
+    .filter((c) => c.deckId === deckId && (!asOfDate || c.date <= asOfDate))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const stmt = db.prepareSync(`
-    SELECT amount FROM cards
-    WHERE deckId = ? AND ${dateFilter}
-    ORDER BY date DESC
-    LIMIT 1
-  `);
-
-  const result = stmt.allSync(...params) as Array<{ amount: number }>;
-  return result[0]?.amount ?? 0;
+  return cards[0]?.amount ?? 0;
 }

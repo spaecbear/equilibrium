@@ -10,10 +10,7 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    // SQLite is only supported on native platforms
-    if (Platform.OS !== 'web') {
-      initializeDatabase();
-    }
+    initializeDatabase();
   }, []);
 
   return (

@@ -22,13 +22,8 @@ export function DeckList({ category, onDeckPress, onRefresh }: DeckListProps) {
     setLoading(true);
     setError(null);
     try {
-      if (Platform.OS === 'web') {
-        // On web, show a placeholder message since SQLite isn't available
-        setDecks([]);
-      } else {
-        const deckList = getDecksByCategory(category);
-        setDecks(deckList);
-      }
+      const deckList = getDecksByCategory(category);
+      setDecks(deckList);
     } catch (err) {
       console.error('Failed to load decks:', err);
       setError('Failed to load decks');
@@ -43,9 +38,14 @@ export function DeckList({ category, onDeckPress, onRefresh }: DeckListProps) {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => {
-          deleteDeck(deckId);
-          loadDecks();
+        onPress: async () => {
+          try {
+            await deleteDeck(deckId);
+            loadDecks();
+          } catch (error) {
+            console.error('Failed to delete deck:', error);
+            alert('Failed to delete deck');
+          }
         },
       },
     ]);
@@ -94,13 +94,10 @@ export function DeckList({ category, onDeckPress, onRefresh }: DeckListProps) {
   }
 
   if (decks.length === 0) {
-    const webMessage = Platform.OS === 'web' ? ' (test decks on iOS/Android)' : '';
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No decks yet{webMessage}</Text>
-        <Text style={styles.emptySubtext}>
-          {Platform.OS === 'web' ? 'Database persistence is for native apps' : 'Create one to get started'}
-        </Text>
+        <Text style={styles.emptyText}>No decks yet</Text>
+        <Text style={styles.emptySubtext}>Create one to get started</Text>
       </View>
     );
   }

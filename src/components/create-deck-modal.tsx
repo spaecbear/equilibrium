@@ -36,27 +36,22 @@ export function CreateDeckModal({ visible, category, deck, onClose, onSuccess }:
     }
   }, [deck, visible]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       alert('Please enter a deck name');
       return;
     }
 
-    if (Platform.OS === 'web') {
-      Alert.alert('Web Preview', 'Database persistence works on iOS/Android. Test the full app there!');
-      onClose();
-      return;
-    }
-
     try {
       if (deck) {
-        updateDeck(deck.id, { name, color: selectedColor as any });
+        await updateDeck(deck.id, { name, color: selectedColor as any });
       } else {
-        createDeck(name, category, selectedColor as any, 'wallet');
+        await createDeck(name, category, selectedColor as any, 'wallet');
       }
       onSuccess();
       onClose();
     } catch (error) {
+      console.error('Error saving deck:', error);
       alert('Failed to save deck');
     }
   };
