@@ -115,17 +115,18 @@ export function DeckList({ category, onDeckPress, onRefresh }: DeckListProps) {
 
 const styles = StyleSheet.create({
   listContent: {
-    gap: Spacing.two,
+    gap: Spacing.three,
   },
   deckCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Colors.dark.backgroundElement,
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderLeftWidth: 4,
+    borderRadius: Spacing.three,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.four,
+    borderLeftWidth: 6,
+    minHeight: 80,
   },
   deckCardPressed: {
     backgroundColor: Colors.dark.accentDim,
@@ -140,29 +141,29 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   deckIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
+    width: 40,
+    height: 40,
+    borderRadius: 8,
   },
   deckName: {
     color: Colors.dark.text,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
   },
   deckCategory: {
     color: Colors.dark.textSecondary,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '500',
-    marginLeft: 32,
+    marginLeft: 48,
   },
   deleteButton: {
-    padding: Spacing.two,
-    marginRight: -Spacing.two,
+    padding: Spacing.three,
+    marginRight: -Spacing.three,
   },
   deleteText: {
     color: Colors.dark.negative,
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
   },
   emptyContainer: {
     paddingVertical: Spacing.four,

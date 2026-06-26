@@ -92,13 +92,16 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: Colors.dark.accent,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.three,
+    borderRadius: Spacing.three,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addButtonText: {
     color: Colors.dark.background,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
   },
   deckListContainer: {
