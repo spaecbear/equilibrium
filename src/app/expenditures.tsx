@@ -1,12 +1,15 @@
 import { SafeAreaView, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { Colors, Spacing, BottomTabInset } from '@/constants/theme';
+import { Deck } from '@/db/database';
 import { DeckList } from '@/components/deck-list';
 import { CreateDeckModal } from '@/components/create-deck-modal';
+import { DeckDetail } from '@/components/deck-detail';
 import { FloatingActionButton } from '@/components/floating-action-button';
 
 export default function ExpendituresScreen() {
   const [createDeckVisible, setCreateDeckVisible] = useState(false);
+  const [selectedDeck, setSelectedDeck] = useState<Deck | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleCreateDeck = () => {
@@ -15,6 +18,10 @@ export default function ExpendituresScreen() {
 
   const handleDeckSuccess = () => {
     setRefreshKey((prev) => prev + 1);
+  };
+
+  const handleDeckPress = (deck: Deck) => {
+    setSelectedDeck(deck);
   };
 
   return (
@@ -31,10 +38,7 @@ export default function ExpendituresScreen() {
           <DeckList
             category="expenditures"
             key={refreshKey}
-            onDeckPress={(deck) => {
-              // TODO: Navigate to deck detail screen
-              console.log('Deck pressed:', deck.name);
-            }}
+            onDeckPress={handleDeckPress}
           />
         </View>
       </ScrollView>
@@ -48,6 +52,13 @@ export default function ExpendituresScreen() {
         category="expenditures"
         onClose={() => setCreateDeckVisible(false)}
         onSuccess={handleDeckSuccess}
+      />
+
+      {/* Deck Detail Modal */}
+      <DeckDetail
+        visible={selectedDeck !== null}
+        deck={selectedDeck}
+        onClose={() => setSelectedDeck(null)}
       />
     </SafeAreaView>
   );
