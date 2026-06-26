@@ -1,4 +1,4 @@
-import { View, StyleSheet, FlatList, Pressable, Text, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, Pressable, Text, Alert, Platform } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';
 import { Deck, deleteDeck, getDecksByCategory, Category } from '@/db/database';
 import { useEffect, useState } from 'react';
@@ -12,6 +12,7 @@ interface DeckListProps {
 export function DeckList({ category, onDeckPress, onRefresh }: DeckListProps) {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadDecks();
@@ -19,8 +20,20 @@ export function DeckList({ category, onDeckPress, onRefresh }: DeckListProps) {
 
   const loadDecks = () => {
     setLoading(true);
-    const deckList = getDecksByCategory(category);
-    setDecks(deckList);
+    setError(null);
+    try {
+      if (Platform.OS === 'web') {
+        // On web, show a placeholder message since SQLite isn't available
+        setDecks([]);
+      } else {
+        const deckList = getDecksByCategory(category);
+        setDecks(deckList);
+      }
+    } catch (err) {
+      console.error('Failed to load decks:', err);
+      setError('Failed to load decks');
+      setDecks([]);
+    }
     setLoading(false);
   };
 
@@ -71,11 +84,23 @@ export function DeckList({ category, onDeckPress, onRefresh }: DeckListProps) {
     );
   }
 
-  if (decks.length === 0) {
+  if (error) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No decks yet</Text>
-        <Text style={styles.emptySubtext}>Create one to get started</Text>
+        <Text style={styles.emptyText}>Error loading decks</Text>
+        <Text style={styles.emptySubtext}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (decks.length === 0) {
+    const webMessage = Platform.OS === 'web' ? ' (test decks on iOS/Android)' : '';
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>No decks yet{webMessage}</Text>
+        <Text style={styles.emptySubtext}>
+          {Platform.OS === 'web' ? 'Database persistence is for native apps' : 'Create one to get started'}
+        </Text>
       </View>
     );
   }

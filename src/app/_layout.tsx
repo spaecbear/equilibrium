@@ -1,5 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, Platform } from 'react-native';
 import { useEffect } from 'react';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -10,7 +10,10 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    initializeDatabase();
+    // SQLite is only supported on native platforms
+    if (Platform.OS !== 'web') {
+      initializeDatabase();
+    }
   }, []);
 
   return (

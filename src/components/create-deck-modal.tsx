@@ -7,6 +7,8 @@ import {
   Pressable,
   ScrollView,
   SafeAreaView,
+  Platform,
+  Alert,
 } from 'react-native';
 import { Colors, DeckColorPresets, Spacing } from '@/constants/theme';
 import { createDeck, updateDeck, Deck, Category } from '@/db/database';
@@ -40,14 +42,23 @@ export function CreateDeckModal({ visible, category, deck, onClose, onSuccess }:
       return;
     }
 
-    if (deck) {
-      updateDeck(deck.id, { name, color: selectedColor as any });
-    } else {
-      createDeck(name, category, selectedColor as any, 'wallet');
+    if (Platform.OS === 'web') {
+      Alert.alert('Web Preview', 'Database persistence works on iOS/Android. Test the full app there!');
+      onClose();
+      return;
     }
 
-    onSuccess();
-    onClose();
+    try {
+      if (deck) {
+        updateDeck(deck.id, { name, color: selectedColor as any });
+      } else {
+        createDeck(name, category, selectedColor as any, 'wallet');
+      }
+      onSuccess();
+      onClose();
+    } catch (error) {
+      alert('Failed to save deck');
+    }
   };
 
   return (
