@@ -1,13 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect, useFocusEffect } from 'react';
 import { StyleSheet, View, Text, SafeAreaView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors, Spacing, BottomTabInset } from '@/constants/theme';
 import { EQWordmark } from '@/components/eq-wordmark';
+import { getCategoryTotal } from '@/db/database';
 
 export default function OverviewScreen() {
-  const [total, setTotal] = useState(0);
+  const [assetsTotal, setAssetsTotal] = useState(0);
+  const [incomesTotal, setIncomesTotal] = useState(0);
+  const [expendituresTotal, setExpendituresTotal] = useState(0);
   const [formula, setFormula] = useState<'assets' | 'net' | 'cashflow'>('net');
   const router = useRouter();
+
+  useFocusEffect(() => {
+    loadTotals();
+  });
+
+  const loadTotals = () => {
+    const assets = getCategoryTotal('assets');
+    const incomes = getCategoryTotal('incomes');
+    const expenditures = getCategoryTotal('expenditures');
+
+    setAssetsTotal(assets);
+    setIncomesTotal(incomes);
+    setExpendituresTotal(expenditures);
+  };
+
+  const calculateTotal = (): number => {
+    switch (formula) {
+      case 'assets':
+        return assetsTotal;
+      case 'net':
+        return assetsTotal + incomesTotal - expendituresTotal;
+      case 'cashflow':
+        return incomesTotal - expendituresTotal;
+      default:
+        return 0;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -21,32 +51,38 @@ export default function OverviewScreen() {
         {/* Main total display */}
         <View style={styles.totalSection}>
           <Text style={styles.totalLabel}>Total Balance</Text>
-          <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
-          <Text style={styles.formulaHint}>{formula}</Text>
+          <Text style={styles.totalValue}>${calculateTotal().toFixed(2)}</Text>
+          <Pressable onPress={() => {
+            const formulas: Array<'assets' | 'net' | 'cashflow'> = ['assets', 'net', 'cashflow'];
+            const currentIndex = formulas.indexOf(formula);
+            setFormula(formulas[(currentIndex + 1) % formulas.length]);
+          }}>
+            <Text style={styles.formulaHint}>{formula === 'assets' ? 'Assets Only' : formula === 'net' ? 'Assets + Income - Spent' : 'Income - Spent'}</Text>
+          </Pressable>
         </View>
 
-        {/* Summary cards (placeholder for now) */}
+        {/* Summary cards */}
         <View style={styles.summaryContainer}>
           <Pressable
             style={[styles.summaryCard, styles.assetsCard]}
             onPress={() => router.push('/assets')}
           >
             <Text style={styles.summaryLabel}>Assets</Text>
-            <Text style={styles.summaryValue}>$0.00</Text>
+            <Text style={styles.summaryValue}>${assetsTotal.toFixed(2)}</Text>
           </Pressable>
           <Pressable
             style={[styles.summaryCard, styles.incomeCard]}
             onPress={() => router.push('/incomes')}
           >
             <Text style={styles.summaryLabel}>Income</Text>
-            <Text style={styles.summaryValue}>$0.00</Text>
+            <Text style={styles.summaryValue}>${incomesTotal.toFixed(2)}</Text>
           </Pressable>
           <Pressable
             style={[styles.summaryCard, styles.expenseCard]}
             onPress={() => router.push('/expenditures')}
           >
             <Text style={styles.summaryLabel}>Spent</Text>
-            <Text style={styles.summaryValue}>$0.00</Text>
+            <Text style={styles.summaryValue}>${expendituresTotal.toFixed(2)}</Text>
           </Pressable>
         </View>
 
